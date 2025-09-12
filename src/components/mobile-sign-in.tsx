@@ -50,8 +50,8 @@ export function MobileSignIn({ onBack, onSignInSuccess }: MobileSignInProps) {
               Back
             </Button>
             <div className="flex items-center space-x-2">
-              <Shield className="w-6 h-6 text-purple-600" />
-              <span className="font-bold text-slate-900">
+              <img src="./src/images/Logo.png" alt="Shield Icon" className="w-8 h-8 text-white" />
+              <span className="font-bold text-slate-900 text-2xl">
                 Guard<span className="text-purple-600">Her</span>
               </span>
             </div>

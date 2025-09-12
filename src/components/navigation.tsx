@@ -14,11 +14,11 @@ export function Navigation({ onSignInClick }: NavigationProps) {
       <div className="container mx-auto px-6">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center space-x-3">
-              <div className="p-2 bg-white rounded-lg mr-3">
+          <div className="flex items-center">
+              <div className="bg-white rounded-lg mr-2">
                 <img src="./src/images/Logo.png" alt="Shield Icon" className="w-8 h-8 text-white" />
               </div>
-            <span className="text-2xl font-bold text-slate-900">
+            <span className="text-3xl font-bold text-slate-900">
               Guard<span className="text-transparent bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text">Her</span>
             </span>
           </div>

@@ -17,9 +17,9 @@ export function ModernHero() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Left Content */}
             <div className="space-y-8">
-              <div className="flex items-center space-x-3">
-              <div className="p-2 bg-white rounded-lg mr-3">
-                <img src="./src/images/Logo.png" alt="Shield Icon" className="w-8 h-8 text-white" />
+              <div className="flex items-center">
+              <div className="p-2 rounded-lg mr-1">
+                <img src="./src/images/Logo.png" alt="Shield Icon" className="w-10 h-10 text-white" />
               </div>
                 <h1 className="text-4xl lg:text-6xl font-bold text-slate-900">
                   Guard<span className="text-transparent bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text">Her</span>

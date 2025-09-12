@@ -88,10 +88,10 @@ export function Dashboard({ onSignOut }: DashboardProps) {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg">
-                <Shield className="w-6 h-6 text-white" />
+              <div className="bg-white rounded-lg mr-3">
+                <img src="./src/images/Logo.png" alt="Shield Icon" className="w-8 h-8 text-white" />
               </div>
-              <span className="text-xl font-bold text-slate-900">
+              <span className="text-3xl font-bold text-slate-900">
                 Guard<span className="text-purple-600">Her</span>
               </span>
             </div>
