@@ -1,9 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { Button } from "./ui/button";
-import { Card } from "./ui/card";
-import { Switch } from "./ui/switch";
-import { Badge } from "./ui/badge";
-import { Progress } from "./ui/progress";
+"use client";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Shield, 
   Phone, 
@@ -27,6 +23,112 @@ import {
   Pause
 } from "lucide-react";
 
+// --- Self-contained UI Components to fix build errors ---
+
+const Button = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }
+>(({ className, variant, size, ...props }, ref) => {
+  // Simple button styling, can be expanded
+  const baseClasses = "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none disabled:opacity-50 disabled:pointer-events-none";
+  const variantClasses = variant === "outline" 
+    ? "border border-slate-200 bg-transparent hover:bg-slate-100" 
+    : "bg-slate-900 text-white hover:bg-slate-700";
+  const sizeClasses = size === "sm" ? "h-9 px-3" : "h-10 py-2 px-4";
+  
+  return (
+    <button
+      className={`${baseClasses} ${variantClasses} ${sizeClasses} ${className}`}
+      ref={ref}
+      {...props}
+    />
+  );
+});
+Button.displayName = "Button";
+
+const Card = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={`rounded-lg border bg-white text-slate-900 shadow-sm ${className}`}
+    {...props}
+  />
+));
+Card.displayName = "Card";
+
+const Switch = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { checked: boolean; onCheckedChange: (checked: boolean) => void }
+>(({ className, checked, onCheckedChange, ...props }, ref) => (
+  <button
+    type="button"
+    role="switch"
+    aria-checked={checked}
+    onClick={() => onCheckedChange(!checked)}
+    className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+      checked ? 'bg-purple-600' : 'bg-slate-300'
+    } ${className}`}
+    ref={ref}
+    {...props}
+  >
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-lg ring-0 transition-transform duration-300 ease-in-out ${
+        checked ? 'translate-x-7' : 'translate-x-0'
+      }`}
+    />
+  </button>
+));
+Switch.displayName = "Switch";
+
+const Badge = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { variant?: string }
+>(({ className, variant, ...props }, ref) => {
+  return (
+    <div
+      ref={ref}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none ${className}`}
+      {...props}
+    />
+  );
+});
+Badge.displayName = "Badge";
+
+const Progress = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { value?: number }
+>(({ className, value, ...props }, ref) => (
+    <div
+        ref={ref}
+        className={`relative h-2 w-full overflow-hidden rounded-full bg-slate-200 ${className}`}
+        {...props}
+    >
+        <div
+            className="h-full w-full flex-1 bg-green-500 transition-all"
+            style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+        />
+    </div>
+));
+Progress.displayName = "Progress";
+
+
+// --- Logic from RecordingView is now integrated here ---
+
+const SpeechRecognition =
+  typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
+  }
+}
+
+// --- End of Integrated Logic ---
+
 interface DashboardProps {
   onSignOut: () => void;
 }
@@ -38,23 +140,89 @@ export function Dashboard({ onSignOut }: DashboardProps) {
     safePaths: true,
     evidenceLocker: true
   });
-  // Calculate safety level based on active features
+
   const safetyLevel = useMemo(() => {
     const activeCount = Object.values(activeFeatures).filter(Boolean).length;
     return Math.round((activeCount / 4) * 100);
   }, [activeFeatures]);
-  const [isRecording, setIsRecording] = useState(false);
+
   const [meshConnections, setMeshConnections] = useState(12);
-  const [currentLocation, setCurrentLocation] = useState("Connaught Place, Delhi");
+  const [currentLocation, setCurrentLocation] = useState("Jaipur, Rajasthan");
 
   const [emergencyContacts] = useState([
     { name: "Emergency Services", number: "112" },
     { name: "Police", number: "100" },
     { name: "Women Helpline", number: "181" }
   ]);
+  
+  // --- STATE AND LOGIC FOR RECORDING ---
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingComplete, setRecordingComplete] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    // Simulate mesh network updates
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const startRecording = () => {
+    if (!SpeechRecognition) {
+      alert("Sorry, your browser does not support the Web Speech API. Please try Google Chrome or Microsoft Edge.");
+      return;
+    }
+    setRecordingComplete(false);
+    setTranscript(""); 
+    setIsRecording(true);
+
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = true;
+    recognitionRef.current.interimResults = true;
+
+    recognitionRef.current.onresult = (event: any) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+
+      for (let i = 0; i < event.results.length; i++) {
+        const transcriptSegment = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcriptSegment + ' ';
+        } else {
+          interimTranscript += transcriptSegment;
+        }
+      }
+      setTranscript(finalTranscript + interimTranscript);
+    };
+    
+    recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error:", event.error);
+        setIsRecording(false);
+    };
+
+    recognitionRef.current.start();
+  };
+
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setRecordingComplete(true);
+      setIsRecording(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+  // --- END OF RECORDING LOGIC ---
+
+  useEffect(() => {
     const interval = setInterval(() => {
       setMeshConnections(prev => Math.max(8, Math.min(20, prev + Math.floor(Math.random() * 3) - 1)));
     }, 3000);
@@ -64,17 +232,13 @@ export function Dashboard({ onSignOut }: DashboardProps) {
 
   const handleSOSAlert = () => {
     alert("🚨 SOS ACTIVATED!\n\n✓ Location shared with emergency contacts\n✓ Audio recording started\n✓ Mesh network alerted\n✓ Evidence collection initiated");
+    if (!isRecording) {
+        startRecording();
+    }
   };
 
   const handlePretendCall = () => {
-    alert("📞 Incoming call from 'Delhi Police'...\n\n'Hello, this is Inspector Sharma from Delhi Police. We need you to come to the station immediately for questioning regarding a case.'");
-  };
-
-  const toggleRecording = () => {
-    setIsRecording(!isRecording);
-    if (!isRecording) {
-      alert("🎤 Evidence recording started\n\nAudio and location data being securely stored...");
-    }
+    alert("📞 Incoming call from 'Jaipur Police'...\n\n'Hello, this is Inspector Singh from Jaipur Police. We need you to come to the station immediately for questioning regarding a case.'");
   };
 
   const findSafePath = () => {
@@ -89,14 +253,13 @@ export function Dashboard({ onSignOut }: DashboardProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="bg-white rounded-lg mr-3">
-                <img src="./src/images/Logo.png" alt="Shield Icon" className="w-8 h-8 text-white" />
+                <img src="https://placehold.co/32x32/8b5cf6/ffffff?text=GH" alt="Shield Icon" className="w-8 h-8 rounded-md" />
               </div>
               <span className="text-3xl font-bold text-slate-900">
                 Guard<span className="text-purple-600">Her</span>
               </span>
             </div>
             
-            {/* Status Indicators */}
             <div className="hidden md:flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Users className="w-4 h-4 text-purple-600" />
@@ -366,7 +529,7 @@ export function Dashboard({ onSignOut }: DashboardProps) {
                   <span className="text-sm font-medium text-slate-700">Auto Recording</span>
                   <Badge variant="secondary" className={
                     activeFeatures.evidenceLocker 
-                      ? (isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700")
+                      ? (isRecording ? "bg-red-100 text-red-700 animate-pulse" : "bg-green-100 text-green-700")
                       : "bg-red-100 text-red-700"
                   }>
                     {activeFeatures.evidenceLocker 
@@ -385,13 +548,14 @@ export function Dashboard({ onSignOut }: DashboardProps) {
                 onClick={toggleRecording}
                 variant="outline" 
                 className={`w-full ${
-                  !activeFeatures.evidenceLocker 
-                    ? 'border-slate-300 text-slate-400 cursor-not-allowed'
+                  !activeFeatures.evidenceLocker || !SpeechRecognition
+                    ? 'border-red-300 text-slate-400 cursor-not-allowed'
                     : isRecording 
                       ? 'border-red-300 text-red-700 hover:bg-red-50' 
                       : 'border-slate-300'
                 }`}
-                disabled={!activeFeatures.evidenceLocker}
+                disabled={!activeFeatures.evidenceLocker || !SpeechRecognition}
+                title={!SpeechRecognition ? "Your browser does not support speech recognition." : ""}
               >
                 {isRecording ? <Pause className="w-4 h-4 mr-2" /> : <Circle className="w-4 h-4 mr-2" />}
                 {!activeFeatures.evidenceLocker 
@@ -400,6 +564,18 @@ export function Dashboard({ onSignOut }: DashboardProps) {
                     ? "Stop Recording" 
                     : "Start Recording"}
               </Button>
+
+              {/* NEW: Transcript Display Area */}
+              {transcript && activeFeatures.evidenceLocker && (
+                <div className="mt-4 bg-slate-100 border border-slate-200 rounded-lg p-3">
+                    <div className="flex justify-between items-center mb-1">
+                        <p className="text-sm font-medium text-slate-800">Live Transcript:</p>
+                        {isRecording && <div className="rounded-full w-3 h-3 bg-red-500 animate-pulse" />}
+                    </div>
+                    <p className="text-sm text-slate-600 italic">{transcript}</p>
+                    {recordingComplete && <p className="text-xs text-green-600 mt-2">Recording saved to Evidence Locker.</p>}
+                </div>
+              )}
             </div>
           </Card>
         </div>
